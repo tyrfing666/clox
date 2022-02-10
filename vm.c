@@ -60,6 +60,13 @@ static Value peek(int distance) {
     return vm.stackTop[-1 - distance];
 }
 
+// is the argument false?
+// Arguments: the value to check.
+// Returns: whether it's false according to Lox definition (nil or boolean false are false, everything else is true).
+static bool isFalsey(Value value) {
+    return IS_NIL(value) || (IS_BOOL(value) && !AS_BOOL(value));
+}
+
 // grab the next opcode and process it.
 InterpretResult interpret(const char* source) {
     Chunk chunk;
@@ -114,15 +121,32 @@ static InterpretResult run() {
                 push(constant);
                 break;
             }
-            case OP_NIL:
+            case OP_NIL: {
                 push(NIL_VAL);
                 break;
-            case OP_TRUE:
+            }
+            case OP_TRUE: {
                 push(BOOL_VAL(true));
                 break;
-            case OP_FALSE:
+            }
+            case OP_FALSE: {
                 push(BOOL_VAL(false));
                 break;
+            }
+            case OP_EQUAL: {
+                Value b = pop();
+                Value a = pop();
+                push(BOOL_VAL(valuesEqual(a, b)));
+                break;
+            }
+            case OP_GREATER: {
+                BINARY_OP(BOOL_VAL, >);
+                break;
+            }
+            case OP_LESS: {
+                BINARY_OP(BOOL_VAL, <);
+                break;
+            }
             case OP_ADD: {
                 BINARY_OP(NUMBER_VAL, +);
                 break;
@@ -137,6 +161,10 @@ static InterpretResult run() {
             }
             case OP_DIVIDE: {
                 BINARY_OP(NUMBER_VAL, /);
+                break;
+            }
+            case OP_NOT: {
+                push(BOOL_VAL(isFalsey(pop())));
                 break;
             }
             case OP_NEGATE: {

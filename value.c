@@ -40,3 +40,24 @@ void printValue(Value value) {
             break;
     }
 }
+
+// Are two values equal?
+// Arguments:
+//  a - first value.
+//  b - second value.
+// Returns: false if they are different types or they are not equal, true otherwise.
+// Note that NIL == NIL in Lox.
+bool valuesEqual(Value a, Value b) {
+    if (a.type != b.type) return false;
+
+    switch (a.type) {
+        case VAL_BOOL:
+            return AS_BOOL(a) == AS_BOOL( b);
+        case VAL_NIL:
+            return true;
+        case VAL_NUMBER:
+            return AS_NUMBER(a) == AS_NUMBER( b);
+        default:
+            return false; // Unreachable.
+    }
+}
