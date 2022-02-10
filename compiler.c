@@ -182,7 +182,7 @@ static void grouping() {
 // emit a constant that is a number.
 static void number() {
     double value = strtod(parser.previous.start, NULL);
-    emitConstant(value);
+    emitConstant(NUMBER_VAL(value));
 }
 
 // handle a unary operator.
