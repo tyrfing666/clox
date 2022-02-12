@@ -7,9 +7,9 @@
 
 // intialize an array of values
 void initValueArray(ValueArray* array) {
-    array-> values = NULL;
-    array-> capacity = 0;
-    array-> count = 0;
+    array->values = NULL;
+    array->capacity = 0;
+    array->count = 0;
 }
 
 // write a value to a value array, growing it if needed
@@ -68,9 +68,8 @@ bool valuesEqual(Value a, Value b) {
         case VAL_NUMBER:
             return AS_NUMBER(a) == AS_NUMBER(b);
         case VAL_OBJ: {
-            ObjString* aString = AS_STRING(a);
-            ObjString* bString = AS_STRING(b);
-            return aString->length == bString->length && memcmp(aString->chars, bString->chars, aString->length) == 0;
+            // for string literals we intern them all so equal pointers means equal strings.
+            return AS_OBJ(a) == AS_OBJ(b);
         }
         default:
             return false; // Unreachable.
