@@ -8,14 +8,21 @@
 // get the object type.
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 
-// is it a function?
+// is it a Lox function?
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
+
+// is it a native function?
+#define IS_NATIVE(value) isObjType(value, OBJ_NATIVE)
 
 // is it a string?
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 
 // cast to a pointer to function (assuming it's safe)
 #define AS_FUNCTION(value) ((ObjFunction*)AS_OBJ(value))
+
+// cast to a native function object.
+#define AS_NATIVE(value) \
+(((ObjNative*)AS_OBJ(value))->function)
 
 // get the ObjString pointer (assuming it's safe).
 #define AS_STRING(value) ((ObjString*)AS_OBJ(value))
@@ -25,6 +32,7 @@
 
 typedef enum {
     OBJ_FUNCTION,
+    OBJ_NATIVE,
     OBJ_STRING,
 } ObjType;
 
@@ -42,6 +50,13 @@ typedef struct {
     ObjString* name;
 } ObjFunction;
 
+typedef Value (*NativeFn)(int argCount, Value* args);
+
+typedef struct {
+    Obj obj;
+    NativeFn function;
+} ObjNative;
+
 // structure for a string. Note the Obj is the first member, so pointer to 
 // it can be used to reference the type.
 struct ObjString {
@@ -51,7 +66,11 @@ struct ObjString {
     uint32_t hash;
 };
 
+// a Lox function.
 ObjFunction* newFunction();
+
+// a native C function
+ObjNative* newNative( NativeFn function);
 
 ObjString* takeString(char* chars, int length);
 
