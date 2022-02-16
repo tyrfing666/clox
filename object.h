@@ -2,21 +2,29 @@
 #define clox_object_h
 
 #include "common.h"
+#include "chunk.h"
 #include "value.h"
 
 // get the object type.
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 
+// is it a function?
+#define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
+
 // is it a string?
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
 
-// get the ObjString pointer.
-#define AS_STRING(value) ((ObjString*) AS_OBJ(value))
+// cast to a pointer to function (assuming it's safe)
+#define AS_FUNCTION(value) ((ObjFunction*)AS_OBJ(value))
+
+// get the ObjString pointer (assuming it's safe).
+#define AS_STRING(value) ((ObjString*)AS_OBJ(value))
 
 // get pointer to the actual C string.
-#define AS_CSTRING(value) (((ObjString*) AS_OBJ(value))->chars)
+#define AS_CSTRING(value) (((ObjString*)AS_OBJ(value))->chars)
 
 typedef enum {
+    OBJ_FUNCTION,
     OBJ_STRING,
 } ObjType;
 
@@ -26,6 +34,14 @@ struct Obj {
     struct Obj* next;
 };
 
+// a function.
+typedef struct {
+    Obj obj;
+    int arity;
+    Chunk chunk;
+    ObjString* name;
+} ObjFunction;
+
 // structure for a string. Note the Obj is the first member, so pointer to 
 // it can be used to reference the type.
 struct ObjString {
@@ -34,6 +50,8 @@ struct ObjString {
     char* chars;
     uint32_t hash;
 };
+
+ObjFunction* newFunction();
 
 ObjString* takeString(char* chars, int length);
 
