@@ -8,6 +8,9 @@
 // get the object type.
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 
+// is it a closure?
+#define IS_CLOSURE(value) isObjType(value, OBJ_CLOSURE)
+
 // is it a Lox function?
 #define IS_FUNCTION(value) isObjType(value, OBJ_FUNCTION)
 
@@ -16,6 +19,9 @@
 
 // is it a string?
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
+
+// cast to closure.
+#define AS_CLOSURE(value) ((ObjClosure*)AS_OBJ(value))
 
 // cast to a pointer to function (assuming it's safe)
 #define AS_FUNCTION(value) ((ObjFunction*)AS_OBJ(value))
@@ -31,9 +37,11 @@
 #define AS_CSTRING(value) (((ObjString*)AS_OBJ(value))->chars)
 
 typedef enum {
+    OBJ_CLOSURE,
     OBJ_FUNCTION,
     OBJ_NATIVE,
     OBJ_STRING,
+    OBJ_UPVALUE,
 } ObjType;
 
 // basic structure for an object.
@@ -46,6 +54,7 @@ struct Obj {
 typedef struct {
     Obj obj;
     int arity;
+    int upvalueCount;
     Chunk chunk;
     ObjString* name;
 } ObjFunction;
@@ -66,16 +75,37 @@ struct ObjString {
     uint32_t hash;
 };
 
-// a Lox function.
+typedef struct ObjUpvalue {
+    Obj obj;
+    Value* location;
+    Value closed;
+    struct ObjUpvalue* next;
+} ObjUpvalue;
+
+// structure for a closure.
+typedef struct {
+    Obj obj;
+    ObjFunction* function;
+    ObjUpvalue** upvalues;
+    int upvalueCount;
+} ObjClosure;
+
+// create a new closure.
+ObjClosure* newClosure(ObjFunction* function);
+
+// create a Lox function.
 ObjFunction* newFunction();
 
-// a native C function
+// create a new representation for a native C function
 ObjNative* newNative( NativeFn function);
 
 ObjString* takeString(char* chars, int length);
 
 // copy a C string into a Value.
 ObjString* copyString(const char* chars, int length);
+
+// create a new upvalue item.
+ObjUpvalue* newUpvalue(Value* slot);
 
 // print an object.
 void printObject(Value value);
