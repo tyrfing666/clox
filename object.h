@@ -47,6 +47,7 @@ typedef enum {
 // basic structure for an object.
 struct Obj {
     ObjType type;
+    bool isMarked;
     struct Obj* next;
 };
 
