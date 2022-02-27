@@ -212,6 +212,7 @@ static void emitConstant(Value value) {
 static void patchJump(int offset) {
     // -2 to adjust for the bytecode for the jump offset itself.
     int jump = currentChunk()->count - offset - 2;
+
     if (jump > UINT16_MAX) {
         error("Too much code to jump over.");
     }
@@ -267,7 +268,9 @@ static void beginScope() {
 // end the current scope.
 static void endScope() {
     current->scopeDepth--;
-    while (current->localCount > 0 && current->locals[current->localCount - 1].depth > current->scopeDepth) {
+    while (current->localCount > 0 && 
+           current->locals[current->localCount - 1].depth >
+              current->scopeDepth) {
         if (current->locals[current->localCount - 1].isCaptured) {
             emitByte(OP_CLOSE_UPVALUE);
         } else {
@@ -357,6 +360,26 @@ static void call(bool canAssign) {
     emitBytes(OP_CALL, argCount);
 }
 
+// add variable name to the constant table (as string).
+// Returns: index of the added name in the table.
+static uint8_t identifierConstant(Token* name) {
+    return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
+}
+
+// handle a dot operator (for operating with fields and methods)
+// Arguments: canAssign - whether we can assign at this point.
+static void dot(bool canAssign) {
+    consume(TOKEN_IDENTIFIER, "Expect property name after '.'.");
+    uint8_t name = identifierConstant(&parser.previous);
+
+    if (canAssign && match(TOKEN_EQUAL)) {
+        expression();
+        emitBytes(OP_SET_PROPERTY, name);
+    } else {
+        emitBytes(OP_GET_PROPERTY, name);
+    }
+}
+
 // handle literals.
 // Arguments: canAssign - whether we can assign at this point.
 // For this function it's a dummy since we have to have the same number of 
@@ -430,18 +453,11 @@ static void string(bool canAssign) {
     emitConstant(OBJ_VAL(copyString(parser.previous.start + 1, parser.previous.length - 2)));
 }
 
-// add variable name to the constant table (as string).
-// Returns: index of the added name in the table.
-static uint8_t identifierConstant(Token* name) {
-    return makeConstant(OBJ_VAL(copyString(name->start, name->length)));
-}
-
 // determine if two identifers are the same name.
 // Arguments: a, b - the identifiers to compare.
 // Returns: true if they are the same, false otherwise.
 static bool identifiersEqual(Token* a, Token* b) {
     if (a->length != b->length) return false;
-    
     return memcmp(a->start, b->start, a->length) == 0;
 }
 
@@ -457,6 +473,7 @@ static int resolveLocal(Compiler* compiler, Token* name) {
             return i;
         }
     }
+
     return -1;
 }
 
@@ -483,7 +500,6 @@ static int addUpvalue(Compiler* compiler, uint8_t index, bool isLocal) {
 
     compiler->upvalues[upvalueCount].isLocal = isLocal;
     compiler->upvalues[upvalueCount].index = index;
-    
     return compiler->function->upvalueCount++;
 }
 
@@ -519,7 +535,6 @@ static void addLocal(Token name) {
     }
 
     Local* local = &current->locals[current->localCount++];
-
     local->name = name;
     local->depth = -1;
     local->isCaptured = false;
@@ -541,6 +556,16 @@ static void declareVariable() {
     }
 
     addLocal(*name);
+}
+
+// parse the variable name.
+static uint8_t parseVariable(const char* errorMessage) {
+    consume(TOKEN_IDENTIFIER, errorMessage);
+
+    declareVariable();
+    if (current->scopeDepth > 0) return 0;
+
+    return identifierConstant(&parser.previous);
 }
 
 static void namedVariable(Token name, bool canAssign) {
@@ -591,12 +616,12 @@ static void unary(bool canAssign) {
 }
 
 ParseRule rules[] = {
-    [TOKEN_LEFT_PAREN]      = {grouping,    call,   PREC_NONE},
+    [TOKEN_LEFT_PAREN]      = {grouping,    call,   PREC_CALL},
     [TOKEN_RIGHT_PAREN]     = {NULL,        NULL,   PREC_NONE},
     [TOKEN_LEFT_BRACE]      = {NULL,        NULL,   PREC_NONE},
     [TOKEN_RIGHT_BRACE]     = {NULL,        NULL,   PREC_NONE},
     [TOKEN_COMMA]           = {NULL,        NULL,   PREC_NONE},
-    [TOKEN_DOT]             = {NULL,        NULL,   PREC_NONE},
+    [TOKEN_DOT]             = {NULL,        dot,    PREC_CALL},
     [TOKEN_MINUS]           = {unary,       binary, PREC_TERM},
     [TOKEN_PLUS]            = {NULL,        binary, PREC_TERM},
     [TOKEN_SEMICOLON]       = {NULL,        NULL,   PREC_NONE},
@@ -638,10 +663,12 @@ ParseRule rules[] = {
 static void parsePrecedence(Precedence precedence) {
     advance();
     ParseFn prefixRule = getRule(parser.previous.type)->prefix;
+
     if (prefixRule == NULL) {
         error("Expect expression.");
         return;
     }
+
     bool canAssign = precedence <= PREC_ASSIGNMENT;
     prefixRule(canAssign);
     while (precedence <= getRule(parser.current.type)->precedence) {
@@ -649,19 +676,10 @@ static void parsePrecedence(Precedence precedence) {
         ParseFn infixRule = getRule(parser.previous.type)->infix;
         infixRule(canAssign);
     }
+
     if (canAssign && match(TOKEN_EQUAL)) {
         error("Invalid assignment target.");
     }
-}
-
-// parse the variable name.
-static uint8_t parseVariable(const char* errorMessage) {
-    consume(TOKEN_IDENTIFIER, errorMessage);
-
-    declareVariable();
-    if (current->scopeDepth > 0) return 0;
-
-    return identifierConstant(&parser.previous);
 }
 
 // mark the variable we're defining as initialized so we can now use it.
@@ -692,6 +710,7 @@ static void expression() {
     parsePrecedence(PREC_ASSIGNMENT);
 }
 
+// compile a block
 static void block() {
     while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
         declaration();
@@ -699,6 +718,7 @@ static void block() {
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
 }
 
+// compile a function
 static void function(FunctionType type) {
     Compiler compiler;
     initCompiler(&compiler, type);
@@ -726,6 +746,20 @@ static void function(FunctionType type) {
     }
 }
 
+// declare a class.
+static void classDeclaration() {
+    consume(TOKEN_IDENTIFIER, "Expect class name.");
+    uint8_t nameConstant = identifierConstant(&parser.previous);
+    declareVariable();
+
+    emitBytes(OP_CLASS, nameConstant);
+    defineVariable(nameConstant);
+
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
+}
+
+// declare a function.
 static void funDeclaration() {
     uint8_t global = parseVariable("Expect function name.");
     markInitialized();
@@ -888,8 +922,13 @@ static void synchronize() {
 
 // process a declaration.
 static void declaration() {
-    if (match(TOKEN_FUN)) {
+    // class Foo 
+    if (match(TOKEN_CLASS)) {
+        classDeclaration();
+    // fun Foo
+    } else if (match(TOKEN_FUN)) {
         funDeclaration();
+    // var Foo
     } else if (match(TOKEN_VAR)) {
         varDeclaration();
     } else {
