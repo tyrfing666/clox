@@ -23,11 +23,24 @@ static Obj* allocateObject(size_t size, ObjType type) {
     return object;
 }
 
+// initialize a method for a class (bound to an object).
+// Arguments:
+//  receiver - the object instance to which this method is bound.
+//  method - the method to bind.
+// Returns: the bound method.
+ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method) {
+    ObjBoundMethod* bound = ALLOCATE_OBJ(ObjBoundMethod, OBJ_BOUND_METHOD);
+    bound->receiver = receiver;
+    bound->method = method;
+    return bound;
+}
+
 // initialize a class. variable is "klass" in case we want to use C++, where "class" is reserved.
 // Arguments: name - the class name (useful for debugging)
 ObjClass* newClass(ObjString* name) {
     ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
     klass->name = name;
+    initTable(&klass->methods);
     return klass;
 }
 
@@ -142,6 +155,10 @@ static void printFunction(ObjFunction* function) {
 
 void printObject(Value value) {
     switch (OBJ_TYPE(value)) {
+        case OBJ_BOUND_METHOD: {
+            printFunction(AS_BOUND_METHOD(value)->method->function);
+            break;
+        }
         case OBJ_CLASS: {
             printf("%s", AS_CLASS(value)->name->chars);
             break;

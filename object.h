@@ -9,6 +9,9 @@
 // get the object type.
 #define OBJ_TYPE(value) (AS_OBJ(value)->type)
 
+// is it a method?
+#define IS_BOUND_METHOD(value) isObjType(value, OBJ_BOUND_METHOD)
+
 // is it a class?
 #define IS_CLASS(value) isObjType(value, OBJ_CLASS)
 
@@ -26,6 +29,9 @@
 
 // is it a string?
 #define IS_STRING(value) isObjType(value, OBJ_STRING)
+
+// cast to method.
+#define AS_BOUND_METHOD(value) ((ObjBoundMethod*)AS_OBJ(value))
 
 // cast to class
 #define AS_CLASS(value) ((ObjClass*)AS_OBJ(value))
@@ -49,7 +55,9 @@
 // get pointer to the actual C string.
 #define AS_CSTRING(value) (((ObjString*)AS_OBJ(value))->chars)
 
+// the various types of Lox object that there can be.
 typedef enum {
+    OBJ_BOUND_METHOD,
     OBJ_CLASS,
     OBJ_CLOSURE,
     OBJ_FUNCTION,
@@ -59,11 +67,12 @@ typedef enum {
     OBJ_UPVALUE,
 } ObjType;
 
-// basic structure for an object.
+// The basic structure for an object.  This is the first member for all
+// the other types, so a pointer to it can be used to reference the type.
 struct Obj {
-    ObjType type;
-    bool isMarked;
-    struct Obj* next;
+    ObjType type;       // object type
+    bool isMarked;      // marked to retain in the garbage collection.
+    struct Obj* next;   // pointer to next object.
 };
 
 // a function.
@@ -75,15 +84,16 @@ typedef struct {
     ObjString* name;
 } ObjFunction;
 
+// wrapper for a C native function to be imported into Lox (as a substitute for writing an actual library).
 typedef Value (*NativeFn)(int argCount, Value* args);
 
+// a native function.
 typedef struct {
     Obj obj;
     NativeFn function;
 } ObjNative;
 
-// structure for a string. Note the Obj is the first member, so pointer to 
-// it can be used to reference the type.
+// structure for a string.
 struct ObjString {
     Obj obj;
     int length;
@@ -91,6 +101,7 @@ struct ObjString {
     uint32_t hash;
 };
 
+// an "upvalue" (variable enclosed for use in a closure or object method).
 typedef struct ObjUpvalue {
     Obj obj;
     Value* location;
@@ -110,6 +121,7 @@ typedef struct {
 typedef struct {
     Obj obj;
     ObjString* name;
+    Table methods;
 } ObjClass;
 
 // structure for a class instance.
@@ -118,6 +130,16 @@ typedef struct {
     ObjClass* klass;
     Table fields;
 } ObjInstance;
+
+// a method.
+typedef struct {
+    Obj obj;
+    Value receiver;
+    ObjClosure* method;
+} ObjBoundMethod;
+
+// create a new method.
+ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method);
 
 // create a new class.
 ObjClass* newClass(ObjString* name);
