@@ -35,7 +35,8 @@ void freeTable(Table* table) {
 // it's where we should put this key. If it's not NULL, then either we've found it, or this is the 
 // entry we're replacing.
 static Entry* findEntry(Entry* entries, int capacity, ObjString* key) {
-    uint32_t index = key->hash % capacity;
+    // this can be used instead of "%" because capacity is always a power of two.
+    uint32_t index = key->hash & (capacity - 1);
     Entry* tombstone = NULL;
 
     for (;;) {
@@ -54,7 +55,8 @@ static Entry* findEntry(Entry* entries, int capacity, ObjString* key) {
             // We found the key.
             return entry;
         }
-        index = (index + 1) % capacity;
+        // this can be used instead of "%" because capacity is always a power of two.
+        index = (index + 1) & (capacity - 1);
     }
 }
 
@@ -160,8 +162,9 @@ void tableAddAll(Table* from, Table* to) {
 
 ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t hash) {
     if (table->count == 0) return NULL;
-    
-    uint32_t index = hash % table->capacity;
+
+    // this can be used instead of "%" because capacity is always a power of two.
+    uint32_t index = hash & (table->capacity - 1);
     
     for (;;) {
         Entry* entry = &table->entries[index];
@@ -172,7 +175,9 @@ ObjString* tableFindString(Table* table, const char* chars, int length, uint32_t
             // We found it.
             return entry->key;
         }
-        index = (index + 1) % table-> capacity;
+
+        // this can be used instead of "%" because capacity is always a power of two.
+        index = (index + 1) & (table-> capacity - 1);
     }
 }
 
